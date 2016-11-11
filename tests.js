@@ -6,35 +6,57 @@ global.test_var = 0
 global.test_var_1 = 0
 global.test_var_2 = 0
 
-rewrite_module('m1', `
-  //let old_var, old_var_2 = 2;
-  function foo(a,b) {
-    function inner() {
-      return 1;
+fun init()
+  rewrite_module('m1', `
+    function bar() {
+      let x = 3;
+      this.y = 4;
+      this.getter = function() {
+        return x;
+      }
     }
-    return inner
-  }
-`)
-  //global.foo = foo
-log('--------------------------')
+    function foo() {
+      test_var = new bar()
+    }
+  `)
+    //global.foo = foo
+  foo()
+  test_var_1 = test_var
+  //test_var_1 = test_var
+  console.log(test_var_1+'')
+
 export fun update()
   update_module('m1', `
-    //let new_var = 2;
-    function foo(a,b) {
-      function inner() {
-        return 2;
+    function bar() {
+      let x = 4;
+      this.y = 5;
+      this.getter = function() {
+        return x*x;
       }
-      return inner
     }
+    function foo() {
+      test_var = new bar()
+    }
+    events.on('ready', function() {
+      //some code
+    })
   `)
   //*/
   //global.foo = foo
+  foo()
+  test_var_2 = test_var
+  //test_var_2 = test_var
+  console.log(test_var_2+'')
 
   if test_var_2 == 2 && test_var_2 > test_var_1
     console.log('UPDATED')
   else
     console.log('not updated')
   //*/
+
+init()
+log('--------------------------')
+//update()
 
 let repl = require('repl')
 let r = repl.start({

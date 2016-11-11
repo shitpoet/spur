@@ -21,14 +21,14 @@ fun wrap_module(code)
       if (p) {
         //let curr_rev = p["[[rev]]"];
         let curr_rev = global_rev-1;
-        console.log('curr rev '+curr_rev);
+        //console.log('curr rev '+curr_rev);
         if (curr_rev > rev) {
           p = '('+p["[[code]]"]+')';
         } else {
           p = null;
         }
       }
-      console.log('result '+p);
+      //console.log('result '+p);
       return p;
     };`+
     'with($__ctx){'+code+'}'
@@ -41,7 +41,7 @@ fun reflect(name, mod_code)
   let pt = {} // patch tree
   let ast = parse(mod_code)
 
-  fun walk_var(c, a)
+  fun walk_var(c, p, a)
     for d of a.declarations
       //log(d)
       if d.id && d.id.type == 'Identifier'
@@ -53,23 +53,48 @@ fun reflect(name, mod_code)
         }
         c[d.id.name] = cc
         if d.init
-          walk(cc, d.init)
+          walk(cc, d, d.init)
 
-  fun walk_fun(c, a)
+  fun guess_funexpr_name(c, p, a)
+    if p.type == 'AssignmentExpression'
+      let l = p.left
+      if l
+        let lt = p.left.type
+        if lt == 'Identifier'
+          ret l.name
+        elif lt == 'MemberExpression'
+          let lp = l.property
+          let pt = lp.type
+          if pt == 'Identifier'
+            ret lp.name
+          if pt == 'Literal'
+            ret lp.value
+    ret null
+
+  fun walk_fun(c, p, a)
     //log(Array(depth).join('. ')+ node.type)
+    let id
     if a.id
-      log('FUN '+a.id.name)
-      //log(node)
-      let cc = {
-        '[[type]]': 'function',
-        '[[code]]': ast_node_source(mod_code, a),
-        '[[body-start]]': a.body.start,
-        '[[rev]]': 0,
-      }
-      c[a.id.name] = cc
-      walk(cc, a.body.body)
+      id = a.id.name
+    else
+      id = guess_funexpr_name(c, p, a)
+      if !id
+        log(p)
+        log('FUN anonymous!')
+        walk(cc, a, a.body.body) // walk through
+        ret
+    log('FUN '+id)
+    //log(node)
+    let cc = {
+      '[[type]]': 'function',
+      '[[code]]': ast_node_source(mod_code, a),
+      '[[body-start]]': a.body.start,
+      '[[rev]]': 0,
+    }
+    c[id] = cc
+    walk(cc, a, a.body.body)
 
-  /*fun walk_childs(c, a)
+  fun walk_childs(c, p, a)
     //log(a)
     Object.keys(a).forEach(fun(key){
       //if key != 'parent'?
@@ -77,28 +102,40 @@ fun reflect(name, mod_code)
       if Array.isArray(val)
         val.forEach(fun(el) {
           if el && typeof el.type=='string'
-            walk(c, el)
+            walk(c, a, el)
         })
       elif val && typeof val.type=='string'
-        walk(c, val)
-    })*/
+        walk(c, a, val)
+    })
 
-  fun walk(c, a)
+  fun walk(c, p, a, toplevel)
     if Array.isArray(a)
       a.forEach(fun(aa){
-        walk(c, aa)
+        walk(c, p, aa)
       })
     else
       let t = a.type
       //log(t)
       if t == 'VariableDeclaration'
-        walk_var(c, a)
-      if t == 'FunctionDeclaration'
-        walk_fun(c, a)
+        walk_var(c, p, a)
+      elif t == 'FunctionDeclaration'
+        walk_fun(c, p, a)
+      /*if t == 'ExpressionStatement'
+        let e = a.expression
+        let tt = e.type
+        if tt == 'AssignmentExpression'
+          walk(*/
+      /*if t == 'AssignmentExpression'
+        ;*/
+      elif t == 'FunctionExpression'
+        //log(a)
+        walk_fun(c, p, a)
+      else
+        walk_childs(c, p, a)
 
-  walk(pt, ast.body)
+  walk(pt, ast, ast.body, true)
 
-  //log(ctree)
+  //log(pt)
   ret pt
 
 fun rewrite(code, ctree, rev)
@@ -177,15 +214,11 @@ export fun rewrite_module(fn, code)
   code = rewrite(code, pt)
   code = wrap_module(code)
 
-  console.log('rewrite');console.log(code)
+  //console.log('rewrite');console.log(code)
   let script = new vm.Script(code, {filename: fn, displayErrors: true})
   script.runInThisContext()
-  test_var_1 = foo()
-  //test_var_1 = test_var
-  console.log(test_var_1+'')
+
 
 export fun update_module(fn, code)
   generate_patch_code(fn, mod.code, code)
-  test_var_2 = foo()
-  //test_var_2 = test_var
-  console.log(test_var_2+'')
+
