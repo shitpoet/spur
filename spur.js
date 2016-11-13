@@ -31,7 +31,10 @@ fun wrap_module(code)
       //console.log('result '+p);
       return p;
     };`+
-    'with($__ctx){'+code+'}'
+    'with($__ctx){'+
+      code+
+      ';function __eval(s){return eval(s)};'+
+    '}'
   )
 
 fun ast_node_source(source, node)
@@ -57,6 +60,8 @@ fun reflect(name, mod_code)
 
   fun guess_funexpr_name(c, p, a)
     if p.type == 'AssignmentExpression'
+      // funexpr is right value in assignment
+      // f.ex. let x = function(){}
       let l = p.left
       if l
         let lt = p.left.type
@@ -69,6 +74,24 @@ fun reflect(name, mod_code)
             ret lp.name
           if pt == 'Literal'
             ret lp.value
+    elif p.type == 'Property'
+      if p.key.type == 'Identifier'
+        ret p.key.name
+      elif p.key.type == 'Literal'
+        ret p.key.value
+    /*elif p.type == 'CallExpression'
+      // funexpr is argument in fun call
+      // f.ex. foo(function(){})
+      too ambigous...., f.ex:
+        foo(fun(){code1})
+        foo(fun(){code2})
+      - needs diff analysis
+      ret '__arg__'*/
+    elif p.type == 'ReturnStatement'
+      // funexpr is returned
+      // f.ex. return function(){}
+      ret '__return__'
+    //todo: what about IIFE ???
     ret null
 
   fun walk_fun(c, p, a)
@@ -81,8 +104,8 @@ fun reflect(name, mod_code)
       if !id
         log(p)
         log('FUN anonymous!')
-        walk(cc, a, a.body.body) // walk through
-        ret
+        walk(c, a, a.body.body) // walk through
+        ret false
     log('FUN '+id)
     //log(node)
     let cc = {
@@ -215,10 +238,17 @@ export fun rewrite_module(fn, code)
   code = wrap_module(code)
 
   //console.log('rewrite');console.log(code)
+
   let script = new vm.Script(code, {filename: fn, displayErrors: true})
   script.runInThisContext()
-
 
 export fun update_module(fn, code)
   generate_patch_code(fn, mod.code, code)
 
+export fun update_mod_var(name)
+  log('update_mod_var '+name)
+  log($__pt[name])
+  let init = $__pt[name]['[[init]]']
+  if init
+    log('init', init)
+    __eval(name+'='+init)

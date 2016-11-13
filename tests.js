@@ -8,15 +8,16 @@ global.test_var_2 = 0
 
 fun init()
   rewrite_module('m1', `
-    function bar() {
-      let x = 3;
-      this.y = 4;
-      this.getter = function() {
-        return x;
+    let x = {
+      m1: function(){
+        return 1
+      },
+      m2: function(){
+        return 2
       }
     }
     function foo() {
-      test_var = new bar()
+      test_var = x.m1
     }
   `)
     //global.foo = foo
@@ -27,20 +28,19 @@ fun init()
 
 export fun update()
   update_module('m1', `
-    function bar() {
-      let x = 4;
-      this.y = 5;
-      this.getter = function() {
-        return x*x;
+    let x = {
+      m1: function(){
+        return 2
+      },
+      m2: function(){
+        return 2
       }
     }
     function foo() {
-      test_var = new bar()
+      test_var = x.m1
     }
-    events.on('ready', function() {
-      //some code
-    })
   `)
+  //update_mod_var('x')
   //*/
   //global.foo = foo
   foo()
@@ -56,7 +56,7 @@ export fun update()
 
 init()
 log('--------------------------')
-//update()
+update()
 
 let repl = require('repl')
 let r = repl.start({
