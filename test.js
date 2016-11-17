@@ -1,6 +1,7 @@
 "use strict";
 
 //var fs = require('fs')
-require('./use')
-use('tests')
+//require('./use')
+//use('tests')
+require('./spur')
 
